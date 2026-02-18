@@ -70,7 +70,7 @@ builder.Services.AddAuthentication(options =>
         ?? throw new InvalidOperationException("GoogleOAuth:ClientId not configured.");
     options.ClientSecret = builder.Configuration["GoogleOAuth:ClientSecret"]
         ?? throw new InvalidOperationException("GoogleOAuth:ClientSecret not configured.");
-    options.CallbackPath = "/signin-google";
+    options.CallbackPath = "/auth/google-callback";
 });
 
 builder.Services.AddAuthorization();
