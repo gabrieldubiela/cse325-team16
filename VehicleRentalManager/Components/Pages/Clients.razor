@@ -1,0 +1,222 @@
+@page "/clients"
+// Enable interactive rendering to support button clicks and form submissions via SignalR.
+@rendermode InteractiveServer
+@inject IClientService ClientService
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@using VehicleRentalManager.Models
+@using VehicleRentalManager.Services
+
+<h3>Clients</h3>
+
+<button type="button" class="btn btn-primary mb-3" @onclick="ShowCreateForm">
+    Create New Client
+</button>
+
+@if (showForm)
+{
+    <EditForm Model="newClient" OnValidSubmit="CreateOrUpdateClient">
+        <DataAnnotationsValidator />
+        <label for="name">Name</label>
+        <InputText id="name" @bind-Value="newClient.Name" class="form-control mb-2" />
+        <ValidationMessage For="@(() => newClient.Name)" />
+        <label for="email">Email</label>
+        <InputText id="email" @bind-Value="newClient.Email" class="form-control mb-2" type="email" />
+        <ValidationMessage For="@(() => newClient.Email)" />
+        <label for="phone">Phone</label>
+        <InputText id="phone" @bind-Value="newClient.Phone" class="form-control mb-2" placeholder="(123) 456-7890" />
+        <ValidationMessage For="@(() => newClient.Phone)" />
+        <label for="driverLicense">Driver License</label>
+        <InputText id="driverLicense" @bind-Value="newClient.DriverLicense" class="form-control mb-2" />
+        <ValidationMessage For="@(() => newClient.DriverLicense)" />
+        <label for="address">Address</label>
+        <InputTextArea id="address" @bind-Value="newClient.Address" class="form-control mb-2" rows="2" />
+        <div class="form-check mb-2">
+            <InputCheckbox id="isActive" @bind-Value="newClient.IsActive" class="form-check-input" />
+            <label for="isActive" class="form-check-label">Active</label>
+        </div>
+        <button type="submit" class="btn btn-success">Save</button>
+        <button type="button" class="btn btn-secondary" @onclick="CancelForm">Cancel</button>
+    </EditForm>
+}
+
+<!-- FILTERS -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <label class="form-label">Search</label>
+        <InputText @bind-Value="searchTerm" class="form-control" placeholder="Name, email, phone, license..." />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Status</label>
+        <select class="form-select" @bind="statusFilter">
+            <option value="">All</option>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+        </select>
+    </div>
+    <div class="col-md-2 pt-4">
+        <button class="btn btn-outline-secondary" @onclick="ClearFilters">Clear Filters</button>
+    </div>
+    <div class="col-md-3 pt-4">
+        <small>@clients.Count(c => MatchesFilter(c)) of @clients.Count clients</small>
+    </div>
+</div>
+
+@if (!clients.Any(c => MatchesFilter(c)))
+{
+    <p class="alert alert-info">No clients match filters. <button class="btn btn-sm btn-primary"
+                                                                      @onclick="ClearFilters">Clear</button></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Driver License</th>
+                <th>Address</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in clients.Where(c => MatchesFilter(c)))
+            {
+                <tr>
+                    <td>@c.Name</td>
+                    <td>@c.Email</td>
+                    <td>@c.Phone</td>
+                    <td>@c.DriverLicense</td>
+                    <td>@c.Address</td>
+                    <td>
+                        @if (c.IsActive)
+                        {
+                            <span class="badge bg-success">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Inactive</span>
+                        }
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-warning" @onclick="() => StartEdit(c)">Edit</button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteClient(c.Id!)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Client> clients = new();
+    private string searchTerm = "";
+    private string statusFilter = "";
+    private bool showForm = false;
+    private Client newClient = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Manually check auth state to redirect unauthenticated users,
+        // ensuring the page is protected even if the router allows navigation.
+        var user = await AuthService.GetCurrentUserAsync();
+        if (!user.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/auth");
+            return;
+        }
+
+        clients = await ClientService.GetAsync() ?? new();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        StateHasChanged();
+    }
+
+    private bool MatchesFilter(Client c)
+    {
+        // Perform client-side filtering for responsiveness.
+        // For larger datasets, this should be moved to the database query (Service layer).
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var term = searchTerm.ToLower();
+            if (!c.Name.Contains(term, StringComparison.OrdinalIgnoreCase) &&
+                !c.Email.Contains(term, StringComparison.OrdinalIgnoreCase) &&
+                !c.Phone.Contains(term, StringComparison.OrdinalIgnoreCase) &&
+                !c.DriverLicense.Contains(term, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        // Status filter
+        if (!string.IsNullOrEmpty(statusFilter))
+        {
+            bool isActive = bool.Parse(statusFilter);
+            if (c.IsActive != isActive)
+                return false;
+        }
+
+        return true;
+    }
+
+    private void ClearFilters()
+    {
+        searchTerm = "";
+        statusFilter = "";
+        StateHasChanged();
+    }
+
+    private void ShowCreateForm()
+    {
+        newClient = new Client { IsActive = true };
+        showForm = true;
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        newClient = new Client();
+    }
+
+    private void StartEdit(Client client)
+    {
+        newClient = new Client
+        {
+            Id = client.Id,
+            Name = client.Name,
+            Email = client.Email,
+            Phone = client.Phone,
+            DriverLicense = client.DriverLicense,
+            Address = client.Address,
+            IsActive = client.IsActive,
+            CreatedAt = client.CreatedAt,
+            LastRentalDate = client.LastRentalDate
+        };
+        showForm = true;
+    }
+
+    private async Task CreateOrUpdateClient()
+    {
+        if (string.IsNullOrEmpty(newClient.Id))
+        {
+            await ClientService.CreateAsync(newClient);
+        }
+        else
+        {
+            await ClientService.UpdateAsync(newClient.Id, newClient);
+        }
+
+        clients = await ClientService.GetAsync() ?? new();
+        showForm = false;
+        StateHasChanged();
+    }
+
+    private async Task DeleteClient(string id)
+    {
+        await ClientService.DeleteAsync(id);
+        clients = await ClientService.GetAsync() ?? new();
+        StateHasChanged();
+    }
+}

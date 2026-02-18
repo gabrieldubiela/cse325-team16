@@ -1,10 +1,12 @@
 @page "/vehicles"
+// Interactive mode required for modal-like form behavior and real-time filtering.
 @rendermode InteractiveServer
 @inject UserService UserService
 @inject AuthService AuthService
+@inject NavigationManager Navigation
 @using VehicleRentalManager.Models
 @using VehicleRentalManager.Services
-@inject VehicleService VehicleService
+@inject IVehicleService VehicleService
 
 <h3>Vehicles</h3>
 
@@ -54,7 +56,7 @@
         <select class="form-select" @bind="statusFilter">
             <option value="">All</option>
             <option value="true">Available</option>
-            <option value="false">Rented</option>
+            <option value="false">Unavailable</option>
         </select>
     </div>
     <div class="col-md-2">
@@ -106,7 +108,7 @@ else
                             }
                             else
                             {
-                                <span class="badge bg-danger">Rented</span>
+                                <span class="badge bg-danger">Unavailable</span>
                             }
                         </td>
                         <td>
@@ -130,6 +132,14 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        // Enforce authentication guard.
+        var user = await AuthService.GetCurrentUserAsync();
+        if (!user.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/auth");
+            return;
+        }
+
         vehicles = await VehicleService.GetAsync() ?? new();
     }
 
@@ -140,7 +150,8 @@ else
 
     private bool MatchesFilter(Vehicle v)
     {
-        // Text filter
+        // Client-side filtering allows for instant feedback without round-trips to the database,
+        // suitable for the expected fleet size.
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
             if (!v.Make.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) &&

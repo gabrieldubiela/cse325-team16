@@ -3,10 +3,11 @@ using VehicleRentalManager.Models;
 
 namespace VehicleRentalManager.Services;
 
-public class VehicleService
+public class VehicleService : IVehicleService
 {
     private readonly IMongoCollection<Vehicle> _vehicles;
 
+    // Inject MongoContext to abstract the database connection details.
     public VehicleService(MongoContext context)
     {
         _vehicles = context.Database.GetCollection<Vehicle>("Vehicle");

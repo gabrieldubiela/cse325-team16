@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace VehicleRentalManager.Services;
 
+// Wrapper for the MongoDB client to centralize configuration and connection lifecycle management.
 public class MongoDbService
 {
     private readonly IMongoDatabase _database;

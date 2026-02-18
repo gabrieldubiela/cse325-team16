@@ -1,9 +1,10 @@
 @page "/approvals"
-@inject UserService UserService
+@inject IUserService UserService
 @inject AuthService AuthService
 @inject NavigationManager Navigation
 @using VehicleRentalManager.Models
 @using VehicleRentalManager.Services
+// Interactive mode needed for Approve/Revoke button actions to trigger server-side logic.
 @rendermode InteractiveServer
 
 <h3>Employees</h3>
@@ -119,6 +120,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        // Enforce authentication guard; redirect to login if no valid session exists.
+        // This prevents unauthorized access to sensitive administrative functions.
         var current = await AuthService.GetCurrentUserAsync();
         if (!current.IsAuthenticated)
         {
@@ -133,6 +136,7 @@ else
     private async Task LoadUsersAsync()
     {
         isLoading = true;
+        // Fetch all users and partition them in memory to avoid multiple database round-trips.
         var all = await UserService.GetAllAsync();
         pendingUsers = all.Where(u => !u.IsApproved).ToList();
         approvedUsers = all.Where(u => u.IsApproved).ToList();

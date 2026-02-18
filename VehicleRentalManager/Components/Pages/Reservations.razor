@@ -1,0 +1,438 @@
+@page "/reservations"
+// Required for dynamic UI updates (wizard steps) and event handling.
+@rendermode InteractiveServer
+@inject IReservationService ReservationService
+@inject IClientService ClientService
+@inject IVehicleService VehicleService
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@using VehicleRentalManager.Models
+@using VehicleRentalManager.Services
+
+<h3>Reservations</h3>
+
+<button type="button" class="btn btn-primary mb-3" @onclick="ShowCreateForm">
+    Create New Reservation
+</button>
+
+@if (showForm)
+{
+    <EditForm Model="newReservation" OnValidSubmit="CreateOrUpdateReservation">
+        <DataAnnotationsValidator />
+        
+        @if (formStep == 1)
+        {
+            <!-- Step 1: Select dates and client -->
+            <h5 class="mb-3">Step 1: Select Dates & Client</h5>
+            
+            <label for="clientId">Client</label>
+            <select id="clientId" @bind="newReservation.ClientId" class="form-select mb-2">
+                <option value=""> Select Client </option>
+                @foreach (var client in clients.Where(c => c.IsActive))
+                {
+                    <option value="@client.Id">@client.Name (@client.Email)</option>
+                }
+            </select>
+            <ValidationMessage For="@(() => newReservation.ClientId)" />
+
+            <label for="startDate">Start Date</label>
+            <InputDate id="startDate" @bind-Value="newReservation.StartDate" class="form-control mb-2" />
+            <ValidationMessage For="@(() => newReservation.StartDate)" />
+
+            <label for="endDate">End Date</label>
+            <InputDate id="endDate" @bind-Value="newReservation.EndDate" class="form-control mb-2" />
+            <ValidationMessage For="@(() => newReservation.EndDate)" />
+
+            <button type="button" class="btn btn-primary" @onclick="LoadAvailableVehicles">
+                Next: Choose Vehicle
+            </button>
+            <button type="button" class="btn btn-secondary" @onclick="CancelForm">Cancel</button>
+        }
+        else if (formStep == 2)
+        {
+            <!-- Step 2: Select vehicle -->
+            <h5 class="mb-3">Step 2: Choose Available Vehicle</h5>
+            
+            <p class="text-muted">
+                @newReservation.StartDate.ToShortDateString() to @newReservation.EndDate.ToShortDateString()
+                (@((newReservation.EndDate - newReservation.StartDate).Days) days)
+            </p>
+
+            @if (isLoadingVehicles)
+            {
+                <p class="text-muted">Loading available vehicles...</p>
+            }
+            else if (!availableVehicles.Any())
+            {
+                <div class="alert alert-warning">
+                    No vehicles available for these dates. Please try different dates.
+                </div>
+                <button type="button" class="btn btn-secondary" @onclick="() => formStep = 1">
+                    ← Back to Dates
+                </button>
+            }
+            else
+            {
+                @if (string.IsNullOrEmpty(newReservation.VehicleId))
+                {
+                    <!-- Show vehicle list -->
+                    <table class="table table-hover mb-3">
+                        <thead>
+                            <tr>
+                                <th>Make</th>
+                                <th>Model</th>
+                                <th>Year</th>
+                                <th>Color</th>
+                                <th>Plate</th>
+                                <th>Price/Day</th>
+                                <th>Total</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var vehicle in availableVehicles)
+                            {
+                                var days = (newReservation.EndDate - newReservation.StartDate).Days;
+                                var totalPrice = (vehicle.PricePerDay ?? 0) * days;
+                                
+                                <tr style="cursor: pointer;" @onclick="() => SelectVehicle(vehicle)">
+                                    <td>@vehicle.Make</td>
+                                    <td>@vehicle.Model</td>
+                                    <td>@vehicle.Year</td>
+                                    <td>@vehicle.Color</td>
+                                    <td>@vehicle.LicensePlate</td>
+                                    <td>$@(vehicle.PricePerDay ?? 0)</td>
+                                    <td>$@totalPrice</td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-primary" @onclick="() => SelectVehicle(vehicle)" @onclick:stopPropagation="true">
+                                            Select
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    
+                    <button type="button" class="btn btn-secondary" @onclick="() => formStep = 1">
+                        ← Back to Dates
+                    </button>
+                }
+                else
+                {
+                    <!-- Show selected vehicle -->
+                    @if (selectedVehicle != null)
+                    {
+                        <div class="card border-success mb-3">
+                            <div class="card-header bg-success text-white">
+                                <strong>Selected Vehicle</strong>
+                            </div>
+                            <div class="card-body">
+                                <h5 class="card-title">@selectedVehicle.Make @selectedVehicle.Model (@selectedVehicle.Year)</h5>
+                                <p class="card-text">
+                                    <strong>Color:</strong> @selectedVehicle.Color<br />
+                                    <strong>Plate:</strong> @selectedVehicle.LicensePlate<br />
+                                    <strong>Price/Day:</strong> $@(selectedVehicle.PricePerDay ?? 0)<br />
+                                    <strong>Total:</strong> $@newReservation.TotalPrice
+                                </p>
+                                <button type="button" class="btn btn-warning" @onclick="UnselectVehicle">
+                                    Change Vehicle
+                                </button>
+                            </div>
+                        </div>
+
+                        <label for="notes">Notes (optional)</label>
+                        <InputTextArea id="notes" @bind-Value="newReservation.Notes" class="form-control mb-2" rows="2" />
+
+                        <button type="submit" class="btn btn-success">
+                            @(string.IsNullOrEmpty(newReservation.Id) ? "Create Reservation" : "Update Reservation")
+                        </button>
+                        <button type="button" class="btn btn-secondary" @onclick="CancelForm">Cancel</button>
+                    }
+                }
+            }
+        }
+    </EditForm>
+}
+
+<!-- FILTERS -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <label class="form-label">Search</label>
+        <InputText @bind-Value="searchTerm" class="form-control" placeholder="Client, vehicle..." />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Status</label>
+        <select class="form-select" @bind="statusFilter">
+            <option value="">All</option>
+            <option value="Active">Active</option>
+            <option value="Completed">Completed</option>
+            <option value="Cancelled">Cancelled</option>
+        </select>
+    </div>
+    <div class="col-md-2 pt-4">
+        <button class="btn btn-outline-secondary" @onclick="ClearFilters">Clear Filters</button>
+    </div>
+    <div class="col-md-3 pt-4">
+        <small>@reservations.Count(r => MatchesFilter(r)) of @reservations.Count reservations</small>
+    </div>
+</div>
+
+@if (!reservations.Any(r => MatchesFilter(r)))
+{
+    <p class="alert alert-info">No reservations match filters. <button class="btn btn-sm btn-primary"
+                                                                          @onclick="ClearFilters">Clear</button></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Client</th>
+                <th>Vehicle</th>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th>Days</th>
+                <th>Total Price</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in reservations.Where(r => MatchesFilter(r)))
+            {
+                <tr>
+                    <td>@(r.Client?.Name ?? "Unknown")</td>
+                    <td>@(r.Vehicle?.Make) @(r.Vehicle?.Model)</td>
+                    <td>@r.StartDate.ToShortDateString()</td>
+                    <td>@r.EndDate.ToShortDateString()</td>
+                    <td>@((r.EndDate - r.StartDate).Days)</td>
+                    <td>$@r.TotalPrice</td>
+                    <td>
+                        @if (r.Status == ReservationStatus.Active)
+                        {
+                            <span class="badge bg-success">Active</span>
+                        }
+                        else if (r.Status == ReservationStatus.Completed)
+                        {
+                            <span class="badge bg-secondary">Completed</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-danger">Cancelled</span>
+                        }
+                    </td>
+                    <td>
+                        @if (r.Status == ReservationStatus.Active)
+                        {
+                            <button class="btn btn-sm btn-warning" @onclick="() => StartEdit(r)">Edit</button>
+                            <button class="btn btn-sm btn-success" @onclick="() => CompleteReservation(r.Id!)">Complete</button>
+                            <button class="btn btn-sm btn-warning" @onclick="() => CancelReservation(r.Id!)">Cancel</button>
+                        }
+                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteReservation(r.Id!)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Reservation> reservations = new();
+    private List<Client> clients = new();
+    private List<Vehicle> availableVehicles = new();
+    private Vehicle? selectedVehicle => availableVehicles.FirstOrDefault(v => v.Id == newReservation.VehicleId);
+    private string searchTerm = "";
+    private string statusFilter = "";
+    private bool showForm = false;
+    private bool isLoadingVehicles = false;
+    private int formStep = 1;
+    private Reservation newReservation = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Enforce authentication guard.
+        var user = await AuthService.GetCurrentUserAsync();
+        if (!user.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/auth");
+            return;
+        }
+
+        await LoadDataAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        StateHasChanged();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        reservations = await ReservationService.GetAsync() ?? new();
+        clients = await ClientService.GetAsync() ?? new();
+    }
+
+    private bool MatchesFilter(Reservation r)
+    {
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var term = searchTerm.ToLower();
+            if ((r.Client?.Name?.Contains(term, StringComparison.OrdinalIgnoreCase) != true) &&
+                (r.Vehicle?.Make?.Contains(term, StringComparison.OrdinalIgnoreCase) != true) &&
+                (r.Vehicle?.Model?.Contains(term, StringComparison.OrdinalIgnoreCase) != true))
+                return false;
+        }
+
+        if (!string.IsNullOrEmpty(statusFilter))
+        {
+            if (r.Status.ToString() != statusFilter)
+                return false;
+        }
+
+        return true;
+    }
+
+    private void ClearFilters()
+    {
+        searchTerm = "";
+        statusFilter = "";
+        StateHasChanged();
+    }
+
+    private void ShowCreateForm()
+    {
+        newReservation = new Reservation
+        {
+            StartDate = DateTime.Today,
+            EndDate = DateTime.Today.AddDays(1),
+            Status = ReservationStatus.Active
+        };
+        formStep = 1;
+        availableVehicles.Clear();
+        showForm = true;
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        newReservation = new Reservation();
+        formStep = 1;
+        availableVehicles.Clear();
+    }
+
+    private async Task StartEdit(Reservation reservation)
+    {
+        newReservation = new Reservation
+        {
+            Id = reservation.Id,
+            ClientId = reservation.ClientId,
+            VehicleId = reservation.VehicleId,
+            StartDate = reservation.StartDate,
+            EndDate = reservation.EndDate,
+            TotalPrice = reservation.TotalPrice,
+            Status = reservation.Status,
+            Notes = reservation.Notes,
+            CreatedAt = reservation.CreatedAt
+        };
+
+        // Pre-load available vehicles for the existing dates to ensure the current vehicle
+        // is valid and to allow the user to swap vehicles immediately.
+        isLoadingVehicles = true;
+        formStep = 2;
+        showForm = true;
+        StateHasChanged();
+
+        availableVehicles = await ReservationService.GetAvailableVehiclesAsync(
+            newReservation.StartDate,
+            newReservation.EndDate);
+
+        // Ensure the currently selected vehicle is in the list even if logic might otherwise exclude it
+        // (e.g., edge cases in availability logic), preserving data integrity for the edit.
+        var currentVehicle = await VehicleService.GetByIdAsync(newReservation.VehicleId);
+        if (currentVehicle != null && !availableVehicles.Any(v => v.Id == currentVehicle.Id))
+        {
+            availableVehicles.Add(currentVehicle);
+        }
+
+        isLoadingVehicles = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadAvailableVehicles()
+    {
+        // Prevent unnecessary database calls if the user hasn't selected a client or valid dates.
+        if (string.IsNullOrEmpty(newReservation.ClientId))
+        {
+            return;
+        }
+
+        if (newReservation.EndDate <= newReservation.StartDate)
+        {
+            return;
+        }
+
+        isLoadingVehicles = true;
+        formStep = 2;
+        StateHasChanged();
+
+        availableVehicles = await ReservationService.GetAvailableVehiclesAsync(
+            newReservation.StartDate,
+            newReservation.EndDate);
+
+        isLoadingVehicles = false;
+        StateHasChanged();
+    }
+
+    private void SelectVehicle(Vehicle vehicle)
+    {
+        newReservation.VehicleId = vehicle.Id!;
+        var days = (newReservation.EndDate - newReservation.StartDate).Days;
+        newReservation.TotalPrice = (vehicle.PricePerDay ?? 0) * days;
+        StateHasChanged();
+    }
+
+    private void UnselectVehicle()
+    {
+        newReservation.VehicleId = string.Empty;
+        newReservation.TotalPrice = 0;
+        StateHasChanged();
+    }
+
+    private async Task CreateOrUpdateReservation()
+    {
+        if (string.IsNullOrEmpty(newReservation.Id))
+        {
+            await ReservationService.CreateAsync(newReservation);
+        }
+        else
+        {
+            await ReservationService.UpdateAsync(newReservation.Id, newReservation);
+        }
+
+        await LoadDataAsync();
+        showForm = false;
+        formStep = 1;
+        StateHasChanged();
+    }
+
+    private async Task CompleteReservation(string id)
+    {
+        await ReservationService.UpdateStatusAsync(id, ReservationStatus.Completed);
+        await LoadDataAsync();
+        StateHasChanged();
+    }
+
+    private async Task CancelReservation(string id)
+    {
+        await ReservationService.UpdateStatusAsync(id, ReservationStatus.Cancelled);
+        await LoadDataAsync();
+        StateHasChanged();
+    }
+
+    private async Task DeleteReservation(string id)
+    {
+        await ReservationService.DeleteAsync(id);
+        await LoadDataAsync();
+        StateHasChanged();
+    }
+}

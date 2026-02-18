@@ -1,48 +1,44 @@
 ﻿@inject NavigationManager Navigation
 @using Microsoft.AspNetCore.Components.Authorization
 
-
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">VehicleRentalManager</a>
-    </div>
-</div>
-
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
-
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Register Rental
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="approvals">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Employees
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="vehicles">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Vehicles
-            </NavLink>
-        </div>
-        <AuthorizeView>
+<header>
+    <NavLink href="">
+        <img src="images/logo.png" alt="Site Logo">
+    </NavLink>
+    <span id="top">Car Rental Managment</span>
+    <button id="menu"></button>
+    <nav class="@MenuClass">
+        <ul>
+            <li>
+                <NavLink href="reservations">Reservations</NavLink>
+            </li>
+            <li>
+                <NavLink href="vehicles">Vehicles</NavLink>
+            </li>
+            <li>
+                <NavLink href="clients">Clients</NavLink>
+            </li>
+            <li>
+                <NavLink href="approvals">Employees</NavLink>
+            </li>
+            <AuthorizeView>
             <Authorized>
-                <div class="nav-item px-3">
-                    <a class="nav-link" href="/auth/logout-redirect">
-                        <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Logout
-                    </a>
-                </div>
+            <li>
+                <NavLink href="/auth/logout-redirect">Logout</NavLink>
+            </li>
             </Authorized>
         </AuthorizeView>
+        </ul>
     </nav>
-</div>
+</header>
 
+@code {
+    bool open;
+
+    string MenuClass => open ? "open" : "";
+
+    void ToggleMenu()
+    {
+        open = !open;
+    }
+}

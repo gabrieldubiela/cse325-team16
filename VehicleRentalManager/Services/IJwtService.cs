@@ -33,6 +33,7 @@ public class JwtService : IJwtService
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
+        // Include standard claims (Sub, Email, Name) for frontend identity and JTI for token uniqueness/revocation support.
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub,   userId),
@@ -68,6 +69,8 @@ public class JwtService : IJwtService
             var handler = new JwtSecurityTokenHandler();
             var key = Encoding.UTF8.GetBytes(secretKey);
 
+            // Configure strict validation to reject tampered tokens or those from other issuers.
+            // ClockSkew is set to zero to enforce precise expiration times.
             var validationParams = new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,

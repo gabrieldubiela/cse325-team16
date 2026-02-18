@@ -80,6 +80,8 @@
 </div>
 
 @code {
+    // Capture query parameters to display specific messages (e.g., "pending_approval")
+    // after the OAuth callback redirects the user back to the app.
     [Parameter]
     [SupplyParameterFromQuery]
     public string? Status { get; set; }

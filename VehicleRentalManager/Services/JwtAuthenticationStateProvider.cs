@@ -6,20 +6,14 @@ using VehicleRentalManager.Services;
 
 namespace VehicleRentalManager.Services;
 
-/// <summary>
-/// FIX #8: Custom AuthenticationStateProvider that reads the JWT stored in the
-/// "jwt" cookie (set by ExternalLoginCallback) and exposes it to Blazor
-/// components via [CascadingParameter] AuthenticationState.
-///
-/// Without this, AuthenticationStateProvider always returns an anonymous user
-/// because ASP.NET Identity's cookie auth state is not automatically propagated
-/// into the Blazor SignalR circuit.
-/// </summary>
+// Bridges the gap between ASP.NET Core's HTTP context (cookies) and Blazor's SignalR circuit.
+// We manually extract the JWT from the cookie because standard Identity state doesn't automatically flow to the Blazor circuit.
 public class JwtAuthenticationStateProvider : AuthenticationStateProvider
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IJwtService _jwtService;
 
+    // Inject IHttpContextAccessor to access the initial HTTP request cookies during the SignalR circuit establishment.
     public JwtAuthenticationStateProvider(
         IHttpContextAccessor httpContextAccessor,
         IJwtService jwtService)
@@ -32,7 +26,7 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
     {
         var httpContext = _httpContextAccessor.HttpContext;
 
-        // Try to read the JWT from the cookie set by ExternalLoginCallback
+        // Attempt to retrieve the JWT from the cookie to re-hydrate the user's identity within the Blazor circuit.
         if (httpContext != null &&
             httpContext.Request.Cookies.TryGetValue("jwt", out var token) &&
             !string.IsNullOrEmpty(token))
@@ -40,7 +34,8 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
             var userId = _jwtService.ValidateToken(token);
             if (userId != null)
             {
-                // Parse claims directly from the token for the Blazor identity
+                // Reconstruct the ClaimsPrincipal manually from the token because the standard
+                // ASP.NET Core authentication middleware pipeline doesn't run for SignalR messages.
                 var handler = new JwtSecurityTokenHandler();
                 var jwt = handler.ReadJwtToken(token);
 
@@ -55,9 +50,7 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
             new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity())));
     }
 
-    /// <summary>
-    /// Call this after storing a new token so Blazor components re-render.
-    /// </summary>
+    // Expose state change notification publicly to allow login/logout components to trigger UI updates immediately.
     public void NotifyAuthenticationStateChanged()
     {
         NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());

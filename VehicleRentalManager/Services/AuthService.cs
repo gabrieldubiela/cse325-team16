@@ -15,9 +15,8 @@ public class AuthService
 
     public record CurrentUserDto(string? Name, string? Email, bool IsAuthenticated);
 
-    /// <summary>
-    /// Returns the current user's info from Blazor auth state (backed by JWT cookie).
-    /// </summary>
+    // Abstraction to retrieve the current user's profile from the Blazor circuit state,
+    // normalizing claims from different providers (JWT vs Identity) for consistent UI consumption.
     public async Task<CurrentUserDto> GetCurrentUserAsync()
     {
         var state = await _authStateProvider.GetAuthenticationStateAsync();
@@ -34,11 +33,8 @@ public class AuthService
         return new CurrentUserDto(name, email, true);
     }
 
-    /// <summary>
-    /// Logs out by hitting the server logout endpoint which clears the cookie.
-    /// Home.razor then calls Navigation.NavigateTo("/auth", forceLoad: true)
-    /// to reload the circuit with no cookie.
-    /// </summary>
+    // Triggers a browser-level navigation to the logout endpoint to ensure the HTTP-only cookie is cleared.
+    // This cannot be done via Blazor SignalR directly because it lacks access to the HTTP response headers.
     public Task LogoutAsync()
     {
         return Task.CompletedTask;
