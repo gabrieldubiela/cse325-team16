@@ -84,6 +84,24 @@ builder.Services.AddCascadingAuthenticationState();
 
 var app = builder.Build();
 
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("===== EXCEPTION GLOBAL =====");
+        Console.WriteLine(ex.ToString());
+        Console.WriteLine("===== FIM EXCEPTION GLOBAL =====");
+        throw;
+    }
+});
+
+
+
+
 // ── HTTP pipeline ─────────────────────────────────────────────────────────────
 if (!app.Environment.IsDevelopment())
 {
