@@ -133,12 +133,12 @@ else
     protected override async Task OnInitializedAsync()
     {
         // Enforce authentication guard.
-        var user = await AuthService.GetCurrentUserAsync();
-        if (!user.IsAuthenticated)
-        {
-            Navigation.NavigateTo("/auth");
-            return;
-        }
+        // var user = await AuthService.GetCurrentUserAsync();
+        // if (!user.IsAuthenticated)
+        // {
+           //  Navigation.NavigateTo("/auth");
+            // return;
+        // }
 
         vehicles = await VehicleService.GetAsync() ?? new();
     }
