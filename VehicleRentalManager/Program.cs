@@ -107,8 +107,18 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
-    app.UseHttpsRedirection();
 }
+
+app.UseHttpsRedirection();
+app.UseStatusCodePagesWithReExecute("/not-found");
+app.UseStaticFiles();
+
+app.UseRouting();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.UseAntiforgery();
 
 app.UseStatusCodePagesWithReExecute("/not-found"); // Re-execute pipeline for 404s to keep the URL in the browser address bar.
 app.UseStaticFiles();
@@ -138,6 +148,9 @@ app.MapRazorComponents<App>()
 
 app.MapControllers();
 
+app.MapFallbackToPage("/_Host");
+
 app.MapStaticAssets();
 
 app.Run();
+
