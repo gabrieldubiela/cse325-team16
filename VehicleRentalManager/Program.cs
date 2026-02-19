@@ -21,14 +21,17 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 // ── MongoDB services ──────────────────────────────────────────────────────────
-// Register MongoDBService as Singleton; MongoClient is thread-safe and handles connection pooling internally.
+// MongoClient is thread-safe and handles connection pooling internally — safe as Singleton.
 builder.Services.AddSingleton<MongoDbService>();
-builder.Services.AddScoped<UserService>();
 builder.Services.AddSingleton<MongoContext>();
-builder.Services.AddSingleton<VehicleService>();
-builder.Services.AddScoped<VehicleService>();
-builder.Services.AddSingleton<ClientService>();
-builder.Services.AddScoped<ReservationService>();
+
+// Register concrete services AND their interfaces so Blazor pages can inject IClientService, etc.
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<UserService>(); // kept for ExternalLoginCallback which injects the concrete type directly
+builder.Services.AddSingleton<IVehicleService, VehicleService>();
+builder.Services.AddScoped<IClientService, ClientService>();
+builder.Services.AddScoped<IReservationService, ReservationService>();
+
 builder.Services.AddControllers();
 
 // ── JWT + Auth services ───────────────────────────────────────────────────────
@@ -50,7 +53,7 @@ builder.Services.AddAuthentication(options =>
     var secretKey = builder.Configuration["Jwt:SecretKey"]
         ?? throw new InvalidOperationException("Jwt:SecretKey not configured.");
 
-    // Enforce strict token validation to prevent spoofing; issuer/audience checks ensure the token is meant for this specific app.
+    // Enforce strict token validation; issuer/audience checks ensure the token is meant for this specific app.
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer           = true,
@@ -99,9 +102,6 @@ app.Use(async (context, next) =>
     }
 });
 
-
-
-
 // ── HTTP pipeline ─────────────────────────────────────────────────────────────
 if (!app.Environment.IsDevelopment())
 {
@@ -110,22 +110,14 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseStatusCodePagesWithReExecute("/not-found");
 app.UseStaticFiles();
-
 app.UseRouting();
-
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.UseAntiforgery();
+app.UseStatusCodePagesWithReExecute("/not-found");
 
-app.UseStatusCodePagesWithReExecute("/not-found"); // Re-execute pipeline for 404s to keep the URL in the browser address bar.
-app.UseStaticFiles();
-app.UseAuthentication();
-app.UseAuthorization();
-
-// Manually handle logout to ensure the custom 'jwt' cookie is deleted, as standard SignOut might miss it.
+// Manually handle logout to ensure the custom 'jwt' cookie is deleted.
 app.MapGet("/auth/logout-redirect", (HttpContext ctx) =>
 {
     ctx.Response.Cookies.Append("jwt", "", new CookieOptions
@@ -138,8 +130,6 @@ app.MapGet("/auth/logout-redirect", (HttpContext ctx) =>
     ctx.Response.Redirect("/auth");
 }).AllowAnonymous();
 
-app.UseAntiforgery();
-
 // ── Route mappings ────────────────────────────────────────────────────────────
 app.MapRazorPages();
 
@@ -148,9 +138,6 @@ app.MapRazorComponents<App>()
 
 app.MapControllers();
 
-app.MapFallbackToPage("/_Host");
-
 app.MapStaticAssets();
 
 app.Run();
-
