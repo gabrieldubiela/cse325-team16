@@ -1,6 +1,6 @@
 using VehicleRentalManager.Components;
 using VehicleRentalManager.Services;
-
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -85,7 +85,17 @@ builder.Services.AddScoped<Microsoft.AspNetCore.Components.Authorization.Authent
     sp => sp.GetRequiredService<JwtAuthenticationStateProvider>());
 builder.Services.AddCascadingAuthenticationState();
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // Azure's internal IPs — clear defaults to trust the proxy
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 app.Use(async (context, next) =>
 {
@@ -124,7 +134,7 @@ app.MapGet("/auth/logout-redirect", (HttpContext ctx) =>
     {
         Expires  = DateTimeOffset.UtcNow.AddDays(-1),
         HttpOnly = true,
-        Secure   = ctx.Request.IsHttps,
+        Secure   = true,
         SameSite = SameSiteMode.Lax
     });
     ctx.Response.Redirect("/auth");

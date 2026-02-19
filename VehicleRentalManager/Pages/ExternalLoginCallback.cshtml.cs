@@ -64,7 +64,7 @@ public class ExternalLoginCallbackModel : PageModel
         Response.Cookies.Append("jwt", token, new CookieOptions
         {
             HttpOnly = true,
-            Secure   = Request.IsHttps,
+            Secure   = true,
             SameSite = SameSiteMode.Lax,
             Expires  = DateTimeOffset.UtcNow.AddHours(8)
         });
