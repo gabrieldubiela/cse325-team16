@@ -9,7 +9,7 @@ TEAM MEMBERS:
 - Carlos Cervantes
 
 ## Trello Board
-[Group 16](https://trello.com/b/NvZAYAhj/cse-325-net-team-project)
+[Group 16] (https://trello.com/b/NvZAYAhj/cse-325-net-team-project)
 
 ## Production Site
-[Azure Site](https://vehiclerentalmanager-hseyb2fehwaxgrfm.canadacentral-01.azurewebsites.net/)
+[Azure Site] (https://vehiclerentalmanagerproject-gnc8cuekehgdgbfw.brazilsouth-01.azurewebsites.net/)

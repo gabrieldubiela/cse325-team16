@@ -1,5 +1,5 @@
 @page "/vehicles"
-// Interactive mode required for modal-like form behavior and real-time filtering.
+
 @rendermode InteractiveServer
 @inject UserService UserService
 @inject AuthService AuthService
@@ -133,12 +133,12 @@ else
     protected override async Task OnInitializedAsync()
     {
         // Enforce authentication guard.
-        // var user = await AuthService.GetCurrentUserAsync();
-        // if (!user.IsAuthenticated)
-        // {
-           //  Navigation.NavigateTo("/auth");
-            // return;
-        // }
+        var user = await AuthService.GetCurrentUserAsync();
+        if (!user.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/auth");
+            return;
+        }
 
         vehicles = await VehicleService.GetAsync() ?? new();
     }

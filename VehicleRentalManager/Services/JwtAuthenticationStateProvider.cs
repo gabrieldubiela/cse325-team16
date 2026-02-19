@@ -1,8 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.AspNetCore.Components.Server;
-using VehicleRentalManager.Services;
 
 namespace VehicleRentalManager.Services;
 
@@ -10,47 +8,43 @@ namespace VehicleRentalManager.Services;
 // We manually extract the JWT from the cookie because standard Identity state doesn't automatically flow to the Blazor circuit.
 public class JwtAuthenticationStateProvider : AuthenticationStateProvider
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly IJwtService _jwtService;
+    private readonly AuthenticationState _cachedState;
 
-    // Inject IHttpContextAccessor to access the initial HTTP request cookies during the SignalR circuit establishment.
     public JwtAuthenticationStateProvider(
         IHttpContextAccessor httpContextAccessor,
         IJwtService jwtService)
     {
-        _httpContextAccessor = httpContextAccessor;
-        _jwtService = jwtService;
-    }
+        // Capture the auth state immediately during the initial HTTP request.
+        // This is the only moment HttpContext is guaranteed to be available.
+        var httpContext = httpContextAccessor.HttpContext;
 
-    public override Task<AuthenticationState> GetAuthenticationStateAsync()
-    {
-        var httpContext = _httpContextAccessor.HttpContext;
-
-        // Attempt to retrieve the JWT from the cookie to re-hydrate the user's identity within the Blazor circuit.
         if (httpContext != null &&
             httpContext.Request.Cookies.TryGetValue("jwt", out var token) &&
             !string.IsNullOrEmpty(token))
         {
-            var userId = _jwtService.ValidateToken(token);
+            var userId = jwtService.ValidateToken(token);
             if (userId != null)
             {
-                // Reconstruct the ClaimsPrincipal manually from the token because the standard
-                // ASP.NET Core authentication middleware pipeline doesn't run for SignalR messages.
+                // Reconstruct the ClaimsPrincipal from the token claims.
                 var handler = new JwtSecurityTokenHandler();
                 var jwt = handler.ReadJwtToken(token);
-
                 var identity = new ClaimsIdentity(jwt.Claims, "jwt");
                 var user = new ClaimsPrincipal(identity);
-                return Task.FromResult(new AuthenticationState(user));
+                _cachedState = new AuthenticationState(user);
+                return;
             }
         }
 
-        // No valid JWT — return anonymous
-        return Task.FromResult(
-            new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity())));
+        // No valid JWT — anonymous state
+        _cachedState = new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
     }
 
-    // Expose state change notification publicly to allow login/logout components to trigger UI updates immediately.
+    public override Task<AuthenticationState> GetAuthenticationStateAsync()
+    {
+        return Task.FromResult(_cachedState);
+    }
+
+    // Allows login/logout components to trigger UI updates immediately.
     public void NotifyAuthenticationStateChanged()
     {
         NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());

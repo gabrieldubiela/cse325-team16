@@ -27,8 +27,8 @@ builder.Services.AddSingleton<MongoContext>();
 
 // Register concrete services AND their interfaces so Blazor pages can inject IClientService, etc.
 builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<UserService>(); // kept for ExternalLoginCallback which injects the concrete type directly
-builder.Services.AddSingleton<IVehicleService, VehicleService>();
+builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<IVehicleService, VehicleService>();
 builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IReservationService, ReservationService>();
 
